@@ -8,7 +8,11 @@
       "name": "Python: debug app",
       "type": "python",
       "request": "launch",
-      "module": "sqlalchemy14"
+      "module": "uvicorn",
+      "args": [
+        "--reload",
+        "sqlalchemy14:app"
+      ]
     }
   ]
 }

@@ -25,3 +25,8 @@ repos:
   #       language: system
   #       entry: poetry run flake8
   #       types: [python]
+  - repo: https://github.com/pycqa/isort
+    rev: 5.8.0
+    hooks:
+      - id: isort
+        args: ["--profile", "black", "--filter-files"]
