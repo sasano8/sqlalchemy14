@@ -12,25 +12,20 @@ jobs:
         python-version: [3.8]
         # os: [ubuntu-latest, macOS-latest, windows-latest]
 
-  # `container-job` で実行するサービスコンテナ
     services:
-      # サービスコンテナへのアクセスに使用されるラベル
       postgres:
-        # Docker Hub のイメージ
         image: postgres
-        # postgres のパスワードを入力する
         env:
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          ports:
-            - 5432:5432
-        # postgres が起動するまで待機するようにヘルスチェックを設定する
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+        ports:
+          - 5432:5432
 
     steps:
       - name: Check out the code
