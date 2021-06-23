@@ -29,7 +29,6 @@ def db_config():
     user = os.getenv("POSTGRES_USER", "postgres")
     pw = os.getenv("POSTGRES_PASSWORD", "postgres")
     port = os.getenv("POSTGRES_PORT", "5432")
-
     return host, db, user, pw, port
 
 

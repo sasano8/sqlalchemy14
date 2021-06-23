@@ -9,14 +9,14 @@ class Sql:
         self.cls = cls
 
     def insert(self, **values):
-        return get_insert(self.cls).values(*values)
+        return get_insert(self.cls).values(**values)
 
     def upsert(self, **values):
         """挿入または更新を行います。衝突はプライマリキーのみ許可します。（単なるユニークキーは許可しません）"""
-        return get_upsert(self.cls).values(*values)
+        return get_upsert(self.cls).values(**values)
 
     def update(self, **values):
-        return get_update(self.cls).values(*values)
+        return get_update(self.cls).values(**values)
 
     def select(self):
         return get_select(self.cls)

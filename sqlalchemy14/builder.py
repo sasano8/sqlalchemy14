@@ -147,7 +147,7 @@ class DynamimcAsyncCrud(Generic[T]):
         conditions, kwargs = split_where_values(self.__class__, kwargs)
         stmt = self.sql.update(**kwargs).where(*conditions)
         result = await self.db.execute(stmt)
-        return result.fetchone()
+        return self.output(result.fetchone())
 
     async def delete(self, obj: BaseModel = None, /, **kwargs):
         if obj:
