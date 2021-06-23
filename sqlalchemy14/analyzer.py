@@ -34,7 +34,7 @@ def get_primary_keys(cls):
     assert isclass(cls)
     assert hasattr(cls, "_sa_registry")
 
-    return [key for key in inspect(cls).primary_key]
+    return [getattr(cls, key.key) for key in inspect(cls).primary_key]
 
 
 def get_columns(cls) -> Union[List[str], None]:

@@ -12,7 +12,7 @@
   "python.testing.nosetestsEnabled": false,
   "python.testing.pytestEnabled": true,
   "python.testing.pytestArgs": [
-    "--env=local",
+    "--env=docker",
     "-v",
     "tests"
   ],

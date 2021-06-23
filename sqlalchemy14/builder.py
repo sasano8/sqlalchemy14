@@ -139,15 +139,20 @@ class DynamimcAsyncCrud(Generic[T]):
         result = await self.db.execute(stmt)
         return self.output(result.fetchone())
 
-    async def update(self, obj: BaseModel = None, /, **kwargs):
+    def _stmt_update(self, obj: BaseModel = None, /, **kwargs):
         if obj:
             assert not kwargs
             kwargs = obj.dict(exclude_unset=True)
 
         conditions, kwargs = split_where_values(self.__class__, kwargs)
         stmt = self.sql.update(**kwargs).where(*conditions)
+        return stmt
+
+    async def update(self, obj: BaseModel = None, /, **kwargs):
+        stmt = self._stmt_update(obj, **kwargs)
         result = await self.db.execute(stmt)
-        return self.output(result.fetchone())
+        obj = result.fetchone()
+        return self.output(obj)
 
     async def delete(self, obj: BaseModel = None, /, **kwargs):
         if obj:
@@ -157,8 +162,8 @@ class DynamimcAsyncCrud(Generic[T]):
         conditions, kwargs = split_where_values(self.__class__, kwargs)
         stmt = self.sql.delete().where(*conditions)
         result = await self.db.execute(stmt)
-        count = result.count()
-        if not count:
+        obj = result.fetchone()
+        if not obj:
             raise Exception()
 
     async def __iter__(self, query_builder=lambda stmt: stmt):
