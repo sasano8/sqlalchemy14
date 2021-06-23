@@ -55,7 +55,10 @@ def db_engine(db_config):
 async def db_init(db_engine):
     engine, create_session = db_engine
     async with engine.begin() as conn:
-        await conn.run_sync(Base.meta.drop_all)
+        try:
+            await conn.run_sync(Base.meta.drop_all)
+        except:
+            pass
         await conn.run_sync(Base.meta.create_all)
     return engine, create_session
 
