@@ -51,7 +51,8 @@ def db_engine(db_config):
     return engine, create_session
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
+@pytest.mark.docker
 async def db_init(db_engine):
     engine, create_session = db_engine
     async with engine.begin() as conn:
