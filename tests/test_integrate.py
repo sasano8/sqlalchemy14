@@ -100,6 +100,31 @@ def test_integrate(request, db_config):
 
 
 @pytest.mark.docker
-async def test_select(db):
-    result = await Person.crud(db).all()
+async def test_crud(db):
+    schema = Person
+    crud = schema.crud(db)
+
+    result = await crud.all()
+    assert len(result) == 0
+
+    created = await crud.create(name="test_create")
+    assert created.name == "test_create"
+    assert isinstance(created, schema)
+
+    result = await crud.all()
+    assert len(result) == 1
+    assert isinstance(result[0], schema)
+
+    updated = await crud.update(id=created.id, name="test_update")
+    assert updated.name == "test_update"
+    assert isinstance(updated, schema)
+
+    result = await crud.all()
+    assert len(result) == 1
+    assert isinstance(result[0], schema)
+
+    deleted = await crud.delete(id=updated.id)
+    assert deleted is None
+
+    result = await crud.all()
     assert len(result) == 0
