@@ -4,10 +4,11 @@ import pytest
 import sqlalchemy as sa
 from pydantic import BaseModel
 from sqlalchemy import delete
+from sqlalchemy.ext.declarative import declarative_base
 
 from sqlalchemy14 import Crud
 
-Base = sa.ext.declarative.declarative_base()
+Base = declarative_base()
 
 
 class Persons(Base):
@@ -54,10 +55,10 @@ def db_engine(db_config):
 async def db_init(engine, create_session):
     async with engine.begin() as conn:
         try:
-            await conn.run_sync(Base.meta.drop_all)
+            await conn.run_sync(Base.metadata.drop_all)
         except:
             pass
-        await conn.run_sync(Base.meta.create_all)
+        await conn.run_sync(Base.metadata.create_all)
 
 
 INITIALIZED = False
