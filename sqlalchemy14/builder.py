@@ -168,8 +168,8 @@ class DynamimcAsyncCrud(Generic[T]):
 
     async def __iter__(self, query_builder=lambda stmt: stmt):
         stmt = query_builder(self.sql.select())
-        rows = await self.db.execute(stmt)
-        return (self.output(x) for x in rows)
+        result = await self.db.execute(stmt)
+        return (self.output(x) for x in result._iter_impl())
 
     async def all(self, query_builder=lambda stmt: stmt):
         rows = await self.__iter__(query_builder)

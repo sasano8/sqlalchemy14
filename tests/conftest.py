@@ -21,3 +21,17 @@ def pytest_collection_modifyitems(config, items):
                 if not is_run:
                     skip_env = pytest.mark.skip(reason=f"skip env:{env_keyword}")
                     item.add_marker(skip_env)
+
+
+@pytest.fixture(scope="session")
+def event_loop(request):
+    """
+    pytest asyncioはテスト毎にループを作成する。
+    そうすると、セッションやファンクションなど異なるスコープでイベントループが作成され、エラーが生じる。
+    そのため、ここで１つのイベントループに依存し、コントロールを行う。
+    """
+    import asyncio
+
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()

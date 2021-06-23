@@ -55,7 +55,7 @@ def get_returning(entity, columns: Union[List[str], None]):
     assert hasattr(entity, "_sa_registry")
 
     if columns is None:
-        return [entity]
+        return [getattr(entity, x.key) for x in entity.__table__.c]
     else:
         return [getattr(entity, x) for x in columns]
 

@@ -11,7 +11,7 @@ from sqlalchemy14 import Crud
 Base = declarative_base()
 
 
-class Persons(Base):
+class Persons(Base, Crud):
     __tablename__ = "persons"
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.String)
@@ -98,10 +98,10 @@ def test_integrate(request, db_config):
     assert port
 
 
+@pytest.mark.parametrize("schema", [Persons, Person])
 @pytest.mark.docker
 @pytest.mark.asyncio
-async def test_crud(db):
-    schema = Person
+async def test_crud(db, schema):
     crud = schema.crud(db)
 
     result = await crud.all()
