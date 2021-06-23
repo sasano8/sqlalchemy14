@@ -33,7 +33,7 @@ def db_config():
 
 
 @pytest.fixture(scope="session")
-def db_init_engine(db_config):
+def db_engine(db_config):
     import sqlalchemy as sa
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
@@ -52,8 +52,8 @@ def db_init_engine(db_config):
 
 
 @pytest.fixture(scope="session")
-async def db_engine(db_init_engine):
-    engine, create_session = db_init_engine
+async def db_init(db_engine):
+    engine, create_session = db_engine
     async with engine.begin() as conn:
         await conn.run_sync(Base.meta.drop_all)
         await conn.run_sync(Base.meta.create_all)
