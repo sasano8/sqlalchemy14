@@ -51,22 +51,25 @@ def db_engine(db_config):
     return engine, create_session
 
 
-@pytest.fixture(scope="session", autouse=True)
-@pytest.mark.docker
-async def db_init(db_engine):
-    engine, create_session = db_engine
+async def db_init(engine, create_session):
     async with engine.begin() as conn:
         try:
             await conn.run_sync(Base.meta.drop_all)
         except:
             pass
         await conn.run_sync(Base.meta.create_all)
-    return engine, create_session
+
+
+INITIALIZED = False
 
 
 @pytest.fixture(scope="function")
 async def db(db_engine):
     engine, create_session = db_engine
+    global INITIALIZED
+    if not INITIALIZED:
+        await db_init(engine, create_session)
+        INITIALIZED = True
 
     async with create_session() as session:
         stmt = delete(Persons)
