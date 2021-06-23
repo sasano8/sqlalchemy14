@@ -161,10 +161,11 @@ class DynamimcAsyncCrud(Generic[T]):
         if not count:
             raise Exception()
 
-    @classmethod
-    async def all(cls, *conditions):
-        pass
+    async def __iter__(self, query_builder=lambda stmt: stmt):
+        stmt = query_builder(self.sql.select())
+        rows = await self.db.execute(stmt)
+        return (self.output(x) for x in rows)
 
-    @classmethod
-    async def __iter__(cls, *conditions):
-        pass
+    async def all(self, query_builder=lambda stmt: stmt):
+        rows = await self.__iter__(query_builder)
+        return list(rows)
