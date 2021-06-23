@@ -75,14 +75,14 @@ async def db(db_engine):
     async with create_session() as session:
         stmt = delete(Persons)
         result = await session.execute(stmt)
-        session.commit()
+        await session.commit()
 
     async with create_session() as session:
         try:
             yield session
-            session.commit()
+            await session.commit()
         except Exception as e:
-            session.rollback()
+            await session.rollback()
 
 
 @pytest.mark.docker
