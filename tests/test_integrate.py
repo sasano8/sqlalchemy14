@@ -100,6 +100,7 @@ def test_integrate(request, db_config):
 
 
 @pytest.mark.docker
+@pytest.mark.asynico
 async def test_crud(db):
     schema = Person
     crud = schema.crud(db)
