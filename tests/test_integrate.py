@@ -60,6 +60,20 @@ async def db_init(engine, create_session):
         await conn.run_sync(Base.metadata.create_all)
 
 
+@pytest.mark.docker
+def test_integrate(request, db_config):
+    env = request.config.getoption("--env")
+    assert env != "local"
+
+    host, db, user, pw, port = db_config
+
+    assert host
+    assert db
+    assert user
+    assert pw
+    assert port
+
+
 INITIALIZED = False
 
 
@@ -82,20 +96,6 @@ async def db(db_engine):
             await session.commit()
         except Exception as e:
             await session.rollback()
-
-
-@pytest.mark.docker
-def test_integrate(request, db_config):
-    env = request.config.getoption("--env")
-    assert env != "local"
-
-    host, db, user, pw, port = db_config
-
-    assert host
-    assert db
-    assert user
-    assert pw
-    assert port
 
 
 @pytest.mark.parametrize("schema", [Persons, Person])

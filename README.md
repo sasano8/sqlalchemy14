@@ -58,10 +58,10 @@ Sql(Person).delete()
 Person.sql.select()
 
 
-person1 = await Person.crud()(db).create(name="test1")
-person1 = await Person.crud()(db).copy(name="test1")
-person2 = await Person.crud()(db).update(id=1, name="test2")
-person3 = await Person.crud()(db).get(id=person2.id)
-count = await Person.crud()(db).delete(id=person2.id)
+person1 = await Person.crud(db).create(name="test1")
+person1 = await Person.crud(db).copy(name="test1")
+person2 = await Person.crud(db).update(id=1, name="test2")
+person3 = await Person.crud(db).get(id=person2.id)
+count = await Person.crud(db).delete(id=person2.id)
 
 ```
