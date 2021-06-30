@@ -3,9 +3,9 @@ from inspect import _empty as Undefined
 from typing import TYPE_CHECKING, Any, Generic, List, Literal, Type, TypeVar, get_args
 
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from .analyzer import analyze, get_entity
+from .analyzer import analyze, get_columns, get_entity
 from .sql import Sql
 
 T = TypeVar("T")
@@ -28,6 +28,14 @@ def get_own_or_generics(target_cls, expected_cls: Type[T]):
         return types[0]
     else:
         raise Exception()
+
+
+def extract_keys(cls: "DynamimcAsyncCrud", obj) -> dict:
+    keys = {}
+    for key in (x.name for x in cls.get_primary_keys()):
+        keys[key] = getattr(obj, key)
+
+    return keys
 
 
 def split_keys_values(cls: "DynamimcAsyncCrud", kwargs):
@@ -93,41 +101,82 @@ class DynamimcAsyncCrud(Generic[T]):
         cls.sql = Sql(cls.__schema__)
         schema = cls.__schema__
 
-        def output(row):
-            return schema(**row)
+        if cls.__entity__ is cls.__schema__:
+            pass
+        else:
+            schema = cls.__schema__
+            columns: List[str] = get_columns(schema)  # type: ignore
 
-        cls.output = staticmethod(output)  # type: ignore
+            def output(row):
+                return schema.from_orm(row)
+
+            cls.output = staticmethod(output)  # type: ignore
 
     @classmethod
     @lru_cache
     def get_primary_keys(cls):
         # __init_subclass__で実行すると、sqlalchemyが初期化されていないのでカラムを取得できない
-        entity, returning, primary_keys = analyze(cls.__schema__)
+        entity, returning, primary_keys, load_strategies = analyze(cls.__schema__)
         return primary_keys
 
     @classmethod
     @lru_cache
     def get_returnings(cls):
         # __init_subclass__で実行すると、sqlalchemyが初期化されていないのでカラムを取得できない
-        entity, returning, primary_keys = analyze(cls.__schema__)
+        entity, returning, primary_keys, load_strategies = analyze(cls.__schema__)
         return returning
 
-    def __init__(self, db: Session):
-        self.db = db
+    @classmethod
+    @lru_cache
+    def get_load_strategies(cls):
+        # __init_subclass__で実行すると、sqlalchemyが初期化されていないのでカラムを取得できない
+        entity, returning, primary_keys, load_strategies = analyze(cls.__schema__)
+        return load_strategies
+
+    def __init__(self, db: AsyncSession):
+        self.db: AsyncSession = db
 
     @staticmethod
     def output(row):
         return row
 
-    async def get(self, obj: BaseModel = None, /, **kwargs):
-        if obj:
-            assert not kwargs
-            kwargs = obj.dict()
+    async def get_or_none(self, *args, **kwargs):
+        if args and kwargs:
+            raise Exception()
 
-        conditions, kwargs = split_where_values(self.__class__, kwargs)
-        stmt = self.sql.select().where(*conditions)
-        result = await self.db.execute(stmt)
-        return self.output(result.fetchone())
+        if args:
+            pks = self.get_primary_keys()
+            if len(args) != 1:
+                raise Exception()
+
+            if len(pks) != 1:
+                raise Exception()
+
+            condition = {pks[0].key: args[0]}
+        else:
+            condition = kwargs
+
+        stmt = self.sql.get()
+        cur = await self.db.execute(stmt.params(**condition))
+        result = cur.unique().scalar_one_or_none()
+        if result is None:
+            return None
+        else:
+            # TODO: session manage
+            # セッションに含まれているとローダー戦略が変更された時エラーが生じるのでセッションに含まない
+            # ネストしたオブジェクトはおそらくexpungeされない（セッションを参照している）
+            self.db.expunge(result)
+            return self.output(result)
+
+    async def get(self, *args, **kwargs):
+        result = await self.get_or_none(*args, **kwargs)
+        if result is None:
+            raise KeyError()
+        return result
+
+    async def exist(self, *args, **kwargs) -> bool:
+        result = await self.get_or_none(*args, **kwargs)
+        return True if result else False
 
     async def create(self, obj: BaseModel = None, /, **kwargs):
         if obj:
@@ -135,42 +184,87 @@ class DynamimcAsyncCrud(Generic[T]):
             kwargs = obj.dict()
 
         keys, values = split_keys_values(self.__class__, kwargs)
-        stmt = self.sql.insert(**values)
-        result = await self.db.execute(stmt)
-        return self.output(result.fetchone())
+        obj = self.__entity__(**values)
+        self.db.add(obj)
+        await self.db.flush()  # flushしないとリフレッシュできない
+        # await self.db.refresh(obj)  # リフレッシュしないと後続のselectで取れない　←　そんなことはなさそうだ？？
+        self.db.expunge(obj)
+        keys = extract_keys(self.__class__, obj)
+        return await self.get(**keys)
 
-    def _stmt_update(self, obj: BaseModel = None, /, **kwargs):
+    async def update_or_pass(self, obj: BaseModel = None, /, **kwargs):
         if obj:
             assert not kwargs
             kwargs = obj.dict(exclude_unset=True)
 
-        conditions, kwargs = split_where_values(self.__class__, kwargs)
-        stmt = self.sql.update(**kwargs).where(*conditions)
-        return stmt
+        keys, values = split_keys_values(self.__class__, kwargs)
+        condtions = (getattr(self.__entity__, k) == v for k, v in keys.items())
+
+        if not await self.exist(**keys):
+            return None
+
+        stmt = self.sql.update(**values).where(*condtions)
+        cur = await self.db.execute(stmt)
+        return await self.get_or_none(**keys)
 
     async def update(self, obj: BaseModel = None, /, **kwargs):
-        stmt = self._stmt_update(obj, **kwargs)
-        result = await self.db.execute(stmt)
-        obj = result.fetchone()
-        return self.output(obj)
+        result = await self.update_or_pass(obj, **kwargs)
+        if not result:
+            raise KeyError()
+        else:
+            return result
 
-    async def delete(self, obj: BaseModel = None, /, **kwargs):
+    async def delete_or_pass(self, obj: BaseModel = None, /, **kwargs):
         if obj:
             assert not kwargs
             kwargs = obj.dict()
 
-        conditions, kwargs = split_where_values(self.__class__, kwargs)
-        stmt = self.sql.delete().where(*conditions)
-        result = await self.db.execute(stmt)
-        obj = result.fetchone()
-        if not obj:
-            raise Exception()
+        keys, values = split_keys_values(self.__class__, kwargs)
+        condtions = (getattr(self.__entity__, k) == v for k, v in keys.items())
+
+        if not await self.exist(**keys):
+            return 0
+
+        stmt = self.sql.delete().where(*condtions)
+        cur = await self.db.execute(stmt)
+        return 1
+
+    async def delete(self, obj: BaseModel = None, /, **kwargs):
+        count = await self.delete_or_pass(obj, **kwargs)
+        if not count:
+            raise KeyError()
+        else:
+            return 1
 
     async def __iter__(self, query_builder=lambda stmt: stmt):
         stmt = query_builder(self.sql.select())
-        result = await self.db.execute(stmt)
-        return (self.output(x) for x in result._iter_impl())
+        cur = await self.db.execute(stmt)
+        return (self.output(x) for x in cur.scalars())
 
     async def all(self, query_builder=lambda stmt: stmt):
         rows = await self.__iter__(query_builder)
         return list(rows)
+
+    async def split(
+        self, query_builder=lambda stmt: stmt, offset: int = 0, limit: int = 50
+    ):
+        pagenation = lambda stmt: query_builder(stmt).offset(offset).limit(limit)
+        result = await self.all(pagenation)
+        return {
+            "offset": offset,
+            "count": len(result),
+            "result": result,
+        }
+
+    async def pagenate(
+        self, query_builder=lambda stmt: stmt, page: int = 1, per_page: int = 50
+    ):
+        page = max(page, 1)
+        offset = max(page, 0) * per_page
+        pagenation = lambda stmt: query_builder(stmt).offset(offset).limit(per_page)
+        result = await self.all(pagenation)
+        return {
+            "page": page,
+            "count": len(result),
+            "result": result,
+        }

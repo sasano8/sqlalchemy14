@@ -4,6 +4,10 @@ def test_version():
     con = sqlite3.connect(":memory:")
     version = con.execute("select sqlite_version()").fetchone()
 
-    # returningは3.35から動作する
     sqlite3.version == "2.6.0"
-    version[0] == "3.31.1"
+
+    # python3.9.5にはsqlite 3.31が同梱されている
+    # returningは3.35.4から動作する
+    sqlite3.sqlite_version_info[0] >= 3
+    sqlite3.sqlite_version_info[1] >= 35
+    sqlite3.sqlite_version_info[2] >= 4

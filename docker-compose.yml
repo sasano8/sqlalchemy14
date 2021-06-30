@@ -8,4 +8,13 @@ services:
         POSTGRES_PASSWORD: postgres
     ports:
       - 5432:5432
-
+  pgadmin:
+    image: dpage/pgadmin4
+    depends_on:
+      - db
+    environment:
+        PGADMIN_LISTEN_PORT: "5050"
+        PGADMIN_DEFAULT_EMAIL: admin@example.com
+        PGADMIN_DEFAULT_PASSWORD: "test_pgadmin_pw"
+    ports:
+      - "5050:5050"

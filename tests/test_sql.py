@@ -43,9 +43,9 @@ def test_entity():
 
     # fmt: off
     assert str(select) == "SELECT persons.id, persons.name \nFROM persons"
-    assert str(insert) == "INSERT INTO persons DEFAULT VALUES RETURNING persons.id, persons.name"
-    assert str(update) == "UPDATE persons SET  RETURNING persons.id, persons.name"
-    assert str(delete) == "DELETE FROM persons RETURNING persons.id"
+    assert str(insert) == "INSERT INTO persons () VALUES () RETURNING persons.id, persons.name"
+    assert str(update) == "UPDATE persons SET "
+    assert str(delete) == "DELETE FROM persons"
     # fmt: on
 
 
@@ -57,9 +57,9 @@ def test_model():
 
     # fmt: off
     assert str(select) == "SELECT persons.id, persons.name \nFROM persons"
-    assert str(insert) == "INSERT INTO persons DEFAULT VALUES RETURNING persons.id, persons.name"
-    assert str(update) == "UPDATE persons SET  RETURNING persons.id, persons.name"
-    assert str(delete) == "DELETE FROM persons RETURNING persons.id"
+    assert str(insert) == "INSERT INTO persons () VALUES () RETURNING persons.id, persons.name"
+    assert str(update) == "UPDATE persons SET "
+    assert str(delete) == "DELETE FROM persons"
     # fmt: on
 
 
@@ -71,9 +71,9 @@ def test_dataclass():
 
     # fmt: off
     assert str(select) == "SELECT persons.id, persons.name \nFROM persons"
-    assert str(insert) == "INSERT INTO persons DEFAULT VALUES RETURNING persons.id, persons.name"
-    assert str(update) == "UPDATE persons SET  RETURNING persons.id, persons.name"
-    assert str(delete) == "DELETE FROM persons RETURNING persons.id"
+    assert str(insert) == "INSERT INTO persons () VALUES () RETURNING persons.id, persons.name"
+    assert str(update) == "UPDATE persons SET "
+    assert str(delete) == "DELETE FROM persons"
     # fmt: on
 
 
@@ -84,8 +84,8 @@ def test_model_filter():
     delete = Sql(PersonFilter).delete()
 
     # fmt: off
-    assert str(select) == "SELECT persons.name \nFROM persons"
-    assert str(insert) == "INSERT INTO persons DEFAULT VALUES RETURNING persons.name"
-    assert str(update) == "UPDATE persons SET  RETURNING persons.name"
-    assert str(delete) == "DELETE FROM persons RETURNING persons.id"
+    assert str(select) == "SELECT persons.id, persons.name \nFROM persons"
+    assert str(insert) == "INSERT INTO persons () VALUES () RETURNING persons.name"
+    assert str(update) == "UPDATE persons SET "
+    assert str(delete) == "DELETE FROM persons"
     # fmt: on

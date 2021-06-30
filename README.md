@@ -17,51 +17,47 @@ deleteの場合は、プライマリキーを返します。
 一度解析されたモデルのクエリはキャッシュされるので、高速にクエリを構築できます。
 
 ``` python
+import asyncio
 import sqlalchemy as sa
-from sqlalchemy.orm import declarative_base
 from pydantic import BaseModel
 from dataclasses import dataclass
-from sqlalchemy14 import Sql
+from sqlalchemy14 import Crud, create_engine
+from sqlalchemy import or_, and_
 
 
-Base = declarative_base()
+registry = sa.orm.registry()
+Base = registry.generate_base()
 
-
-class PersonEntity(Base):
+class PersonEntity(Base, Crud):
     __tablename__ = "persons"
 
     id = sa.Column(sa.Integer, primary_key=True)
     password = sa.Column(sa.String)
     name = sa.Column(sa.String)
 
-
-class Person(BaseModel):
-    __entity__ = PersonEntity
+class Person(BaseModel, Crud[PersonEntity]):
+    class Config:
+        orm_mode = True
 
     id: int
     name: str
 
 
-Sql(Person).select()
-# => SELECT persons.id, persons.name FROM persons
+async def main():
+    engine, create_session = create_engine(f"postgresql+asyncpg://{user}:{pw}@{host}:{port}/{db}")
 
-Sql(Person).insert()
-# => INSERT INTO persons () VALUES () RETURNING persons.id, persons.name
+    async with engine.begin() as conn:
+        await conn.run_sync(registry.metadata.drop_all)
+        await conn.run_sync(registry.metadata.create_all)
 
-Sql(Person).update()
-# => UPDATE persons SET  RETURNING persons.id, persons.name
-
-Sql(Person).delete()
-# => DELETE FROM persons RETURNING persons.id
-
-
-Person.sql.select()
+    async with create_session() as db:
+        obj1 = await Person.crud(db).create(name="test1", password="pw1")
+        obj2 = await Person.crud(db).get(id=obj1.id)
+        obj3 = await Person.crud(db).update(id=obj1.id, password="pw2")
+        objects = await Person.crud(db).all()
+        await Person.crud(db).delete(id=obj1.id)
 
 
-person1 = await Person.crud(db).create(name="test1")
-person1 = await Person.crud(db).copy(name="test1")
-person2 = await Person.crud(db).update(id=1, name="test2")
-person3 = await Person.crud(db).get(id=person2.id)
-count = await Person.crud(db).delete(id=person2.id)
+asyncio.run(main())
 
 ```

@@ -4,11 +4,12 @@ import pytest
 import sqlalchemy as sa
 from pydantic import BaseModel
 from sqlalchemy import delete
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
 from sqlalchemy14 import Crud
 
-Base = declarative_base()
+R = sa.orm.registry()
+Base = R.generate_base()
 
 
 class Persons(Base, Crud):
@@ -18,8 +19,48 @@ class Persons(Base, Crud):
 
 
 class Person(BaseModel, Crud[Persons]):
+    class Config:
+        orm_mode = True
+
     id: int = None
     name: str = None
+
+
+class Parents(Base, Crud):
+    __tablename__ = "parents"
+    id = sa.Column(sa.Integer, primary_key=True)
+    name = sa.Column(sa.String)
+    children = relationship("Children")
+
+    def abcd(self):
+        pass
+
+
+class Children(Base, Crud):
+    __tablename__ = "children"
+    id = sa.Column(sa.Integer, primary_key=True)
+    name = sa.Column(sa.String)
+    parent_id = sa.Column(
+        sa.Integer, sa.ForeignKey("parents.id", onupdate="CASCADE", ondelete="CASCADE")
+    )
+
+
+class ChildrenSchema(BaseModel, Crud[Children]):
+    class Config:
+        orm_mode = True
+
+    id: int
+    name: str
+    parent_id: int
+
+
+class ParentSchema(BaseModel, Crud[Parents]):
+    class Config:
+        orm_mode = True
+
+    id: int
+    name: str
+    children: list[ChildrenSchema]
 
 
 @pytest.fixture(scope="session")
@@ -34,30 +75,18 @@ def db_config():
 
 @pytest.fixture(scope="session")
 def db_engine(db_config):
-    import sqlalchemy as sa
-    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-
     host, db, user, pw, port = db_config
     connection_string = f"postgresql+asyncpg://{user}:{pw}@{host}:{port}/{db}"
-    engine = create_async_engine(connection_string)
-    create_session = sa.orm.sessionmaker(
-        bind=engine,
-        autocommit=False,
-        autoflush=False,
-        expire_on_commit=False,
-        class_=AsyncSession,
-    )
+    from sqlalchemy14 import create_engine
 
+    engine, create_session = create_engine(connection_string)
     return engine, create_session
 
 
 async def db_init(engine, create_session):
     async with engine.begin() as conn:
-        try:
-            await conn.run_sync(Base.metadata.drop_all)
-        except:
-            pass
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(R.metadata.drop_all)
+        await conn.run_sync(R.metadata.create_all)
 
 
 @pytest.mark.docker
@@ -86,8 +115,9 @@ async def db(db_engine):
         INITIALIZED = True
 
     async with create_session() as session:
-        stmt = delete(Persons)
-        result = await session.execute(stmt)
+        for table in {Persons, Parents, Children}:
+            stmt = delete(Persons)
+            result = await session.execute(stmt)
         await session.commit()
 
     async with create_session() as session:
@@ -101,7 +131,7 @@ async def db(db_engine):
 @pytest.mark.parametrize("schema", [Persons, Person])
 @pytest.mark.docker
 @pytest.mark.asyncio
-async def test_crud(db, schema):
+async def test_crud(db, schema: Crud):
     crud = schema.crud(db)
 
     result = await crud.all()
@@ -124,7 +154,30 @@ async def test_crud(db, schema):
     assert isinstance(result[0], schema)
 
     deleted = await crud.delete(id=updated.id)
-    assert deleted is None
+    assert deleted == 1
 
     result = await crud.all()
     assert len(result) == 0
+
+
+# @pytest.mark.parametrize("schema", [Persons, Person])
+@pytest.mark.docker
+@pytest.mark.asyncio
+async def test_foreign_key(db):
+    result = await Parents.crud(db).all()
+    assert len(result) == 0
+
+    parent = await Parents.crud(db).create(name="parent_1")
+    child = await Children.crud(db).create(name="child_1", parent_id=parent.id)
+
+    parent2 = await Parents.crud(db).create(name="parent_2")
+    child2 = await Children.crud(db).create(name="child_2", parent_id=parent2.id)
+
+    parent3 = await Parents.crud(db).get(parent2.id)
+    assert isinstance(parent3, Parents)
+    assert parent3
+
+    parent4 = await ParentSchema.crud(db).get(parent3.id)
+    assert parent4
+    assert isinstance(parent4, ParentSchema)
+    assert parent4.children

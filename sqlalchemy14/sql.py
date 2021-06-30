@@ -1,6 +1,13 @@
 from inspect import isclass
 
-from .analyzer import get_delete, get_insert, get_select, get_update, get_upsert
+from .analyzer import (
+    get_delete,
+    get_get,
+    get_insert,
+    get_select,
+    get_update,
+    get_upsert,
+)
 
 
 class Sql:
@@ -20,6 +27,9 @@ class Sql:
 
     def select(self):
         return get_select(self.cls)
+
+    def get(self):
+        return get_get(self.cls)
 
     def delete(self):
         return get_delete(self.cls)
