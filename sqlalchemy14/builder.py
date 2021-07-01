@@ -236,20 +236,25 @@ class DynamimcAsyncCrud(Generic[T]):
         else:
             return 1
 
-    async def __iter__(self, query_builder=lambda stmt: stmt):
-        stmt = query_builder(self.sql.select())
+    async def __iter__(self, *criterion, query_builder=lambda stmt: stmt):
+        stmt = self.sql.select().where(*criterion)
+        stmt = query_builder(stmt)
         cur = await self.db.execute(stmt)
         return (self.output(x) for x in cur.scalars())
 
-    async def all(self, query_builder=lambda stmt: stmt):
-        rows = await self.__iter__(query_builder)
+    async def all(self, *criterion, query_builder=lambda stmt: stmt):
+        rows = await self.__iter__(*criterion, query_builder=query_builder)
         return list(rows)
 
     async def split(
-        self, query_builder=lambda stmt: stmt, offset: int = 0, limit: int = 50
+        self,
+        *criterion,
+        offset: int = 0,
+        limit: int = 50,
+        query_builder=lambda stmt: stmt,
     ):
-        pagenation = lambda stmt: query_builder(stmt).offset(offset).limit(limit)
-        result = await self.all(pagenation)
+        splitter = lambda stmt: query_builder(stmt).offset(offset).limit(limit)
+        result = await self.all(*criterion, query_builder=splitter)
         return {
             "offset": offset,
             "count": len(result),
@@ -257,12 +262,16 @@ class DynamimcAsyncCrud(Generic[T]):
         }
 
     async def pagenate(
-        self, query_builder=lambda stmt: stmt, page: int = 1, per_page: int = 50
+        self,
+        *criterion,
+        page: int = 1,
+        per_page: int = 50,
+        query_builder=lambda stmt: stmt,
     ):
         page = max(page, 1)
         offset = max(page, 0) * per_page
-        pagenation = lambda stmt: query_builder(stmt).offset(offset).limit(per_page)
-        result = await self.all(pagenation)
+        pagenate = lambda stmt: query_builder(stmt).offset(offset).limit(per_page)
+        result = await self.all(*criterion, query_builder=pagenate)
         return {
             "page": page,
             "count": len(result),
